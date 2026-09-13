@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LunaCycle — Advanced Period & Cycle Intelligence</title>
+<style>
+:root{
+  --bg:#f7f7fb;--card:#fff;--text:#20202a;--muted:#727582;--line:#e7e7ef;
+  --accent:#8b5cf6;--accent2:#ec4899;--good:#16a34a;--warn:#d97706;--bad:#dc2626;
+  --shadow:0 12px 40px rgba(35,25,60,.08)
+}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;background:linear-gradient(135deg,#faf9ff,#f5f7fb);color:var(--text)}
+header{padding:24px 5%;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);background:#ffffffcc;backdrop-filter:blur(14px);position:sticky;top:0;z-index:5}
+.brand{font-size:22px;font-weight:800}.brand span{color:var(--accent)}
+.container{max-width:1400px;margin:auto;padding:28px 5% 60px}
+.hero{display:grid;grid-template-columns:1.5fr .8fr;gap:22px;align-items:stretch}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:var(--shadow)}
+h1{font-size:38px;line-height:1.05;margin:0 0 12px}.sub{color:var(--muted);max-width:720px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:20px 0}.stat{padding:18px;border-radius:18px;background:#fafaff;border:1px solid var(--line)}
+.stat b{display:block;font-size:28px;margin-top:5px}.label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+section{margin-top:22px}.section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+h2{margin:0;font-size:21px}
+.form{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.field label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+input,select,button{width:100%;padding:12px 13px;border-radius:12px;border:1px solid var(--line);font:inherit;background:white}
+button{cursor:pointer;font-weight:700}.primary{background:linear-gradient(90deg,var(--accent),var(--accent2));color:white;border:0}.secondary{background:#f6f4ff}
+.actions{display:flex;gap:10px;margin-top:14px}.actions button{width:auto;padding:11px 18px}
+.calendar-wrap{overflow:auto}.calendar{min-width:760px;display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.day-head{text-align:center;font-size:12px;color:var(--muted);padding:8px}.day{min-height:76px;border:1px solid var(--line);border-radius:12px;padding:8px;position:relative;background:white}
+.day.empty{background:transparent;border:0}.num{font-size:12px;font-weight:700}.pill{display:inline-block;font-size:10px;margin-top:7px;padding:4px 7px;border-radius:99px}
+.period{background:#fce7f3}.period .pill{background:#f9a8d4}.fertile{background:#ecfdf5}.fertile .pill{background:#86efac}.ovulation{background:#fef3c7}.ovulation .pill{background:#fcd34d}
+.timeline{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}.phase{padding:16px;border-radius:16px;background:#fafaff;border:1px solid var(--line)}.phase b{display:block;margin-bottom:5px}
+.alert{padding:15px;border-radius:14px;margin-top:12px}.good{background:#ecfdf5;color:#166534}.warn{background:#fff7ed;color:#9a3412}.bad{background:#fef2f2;color:#991b1b}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:12px;border-bottom:1px solid var(--line);font-size:14px}th{font-size:12px;color:var(--muted);text-transform:uppercase}
+canvas{width:100%;height:260px;border:1px solid var(--line);border-radius:16px;background:white}
+.note{font-size:12px;color:var(--muted);line-height:1.6}.privacy{padding:13px;background:#f5f3ff;border-radius:14px;font-size:12px}
+@media(max-width:900px){.hero{grid-template-columns:1fr}.grid{grid-template-columns:repeat(2,1fr)}.form{grid-template-columns:repeat(2,1fr)}.timeline{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.container{padding:18px 4%}.grid,.form{grid-template-columns:1fr}h1{font-size:30px}}
+</style>
+</head>
+<body>
+<header><div class="brand">Luna<span>Cycle</span></div><div class="note">Private • Local-first • No account required</div></header>
+
+<div class="container">
+  <div class="hero">
+    <div class="card">
+      <div class="label">Advanced cycle intelligence</div>
+      <h1>Understand your cycle, not just your calendar.</h1>
+      <p class="sub">Track bleeding, symptoms, flow, cycle length and trends. The dashboard estimates your next period and fertile window from your own history and flags patterns worth discussing with a clinician.</p>
+      <div class="grid">
+        <div class="stat"><span class="label">Average cycle</span><b id="avgCycle">—</b><span>days</span></div>
+        <div class="stat"><span class="label">Average period</span><b id="avgPeriod">—</b><span>days</span></div>
+        <div class="stat"><span class="label">Next period</span><b id="nextPeriod">—</b></div>
+        <div class="stat"><span class="label">Health signal</span><b id="healthScore">—</b></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Quick health signal</h2>
+      <div id="healthBox" class="alert">Add at least 2 cycles to generate a pattern analysis.</div>
+      <p class="note">This is a tracking/education tool, not a diagnosis. Cycle ranges vary with age, contraception, pregnancy/postpartum status and other factors.</p>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="section-title"><h2>1. Add a period</h2><span class="note">Start = first day of bleeding</span></div>
+    <div class="form">
+      <div class="field"><label>Start date</label><input id="startDate" type="date"></div>
+      <div class="field"><label>End date</label><input id="endDate" type="date"></div>
+      <div class="field"><label>Flow</label><select id="flow"><option>Light</option><option selected>Medium</option><option>Heavy</option><option>Very heavy</option></select></div>
+      <div class="field"><label>Notes / symptoms</label><input id="symptoms" placeholder="cramps, headache, mood..."></div>
+    </div>
+    <div class="actions"><button class="primary" onclick="addPeriod()">Add cycle</button><button class="secondary" onclick="seedDemo()">Load demo data</button><button class="secondary" onclick="clearData()">Clear data</button></div>
+  </section>
+
+  <section class="card">
+    <div class="section-title"><h2>2. Cycle calendar</h2><span class="note" id="monthLabel"></span></div>
+    <div class="calendar-wrap"><div id="calendar" class="calendar"></div></div>
+    <div class="note" style="margin-top:10px">Pink = predicted/recorded bleeding • Green = estimated fertile window • Yellow = estimated ovulation. Fertile-window estimates are not reliable contraception.</div>
+  </section>
+
+  <section class="card">
+    <div class="section-title"><h2>3. Cycle analysis</h2><span class="note">Trend-based, not diagnostic</span></div>
+    <div class="timeline">
+      <div class="phase"><b>Menstrual</b><span id="p1">—</span></div>
+      <div class="phase"><b>Follicular</b><span id="p2">—</span></div>
+      <div class="phase"><b>Ovulation*</b><span id="p3">—</span></div>
+      <div class="phase"><b>Fertile window*</b><span id="p4">—</span></div>
+      <div class="phase"><b>Luteal*</b><span id="p5">—</span></div>
+    </div>
+    <p class="note">*These are estimates derived from cycle history. Ovulation cannot be confirmed from calendar dates alone.</p>
+    <canvas id="chart" width="1200" height="260"></canvas>
+  </section>
+
+  <section class="card">
+    <div class="section-title"><h2>4. Wellness & supplement guide</h2><span class="note">Personalized only from logged patterns</span></div>
+    <div id="recommendations"></div>
+    <div class="privacy">Important: do not automatically start iron, high-dose vitamin D, herbal hormone products, or fertility supplements solely because of a period pattern. Iron is especially worth checking with a clinician/lab when bleeding is heavy or prolonged. Supplements can interact with medicines and medical conditions.</div>
+  </section>
+
+  <section class="card">
+    <div class="section-title"><h2>5. History</h2><span class="note">Stored only in this browser</span></div>
+    <table><thead><tr><th>Start</th><th>End</th><th>Period</th><th>Cycle length</th><th>Flow</th><th>Symptoms</th></tr></thead><tbody id="history"></tbody></table>
+  </section>
+
+  <section class="card">
+    <h2>When to seek medical review</h2>
+    <div class="alert warn">
+      Consider medical evaluation if bleeding lasts >7 days, cycles are repeatedly <21 or >35 days apart, cycle length varies substantially, you have bleeding between periods/after sex, or bleeding is unusually heavy. Seek urgent care for very heavy bleeding with dizziness, fainting, weakness, shortness of breath or a racing pulse.
+    </div>
+  </section>
+</div>
+
+<script>
+const KEY="lunacycle_v1";
+let data=JSON.parse(localStorage.getItem(KEY)||"[]");
+const $=id=>document.getElementById(id);
+const iso=d=>new Date(d+"T00:00:00");
+const fmt=d=>new Intl.DateTimeFormat(undefined,{month:"short",day:"numeric",year:"numeric"}).format(d);
+const diff=(a,b)=>Math.round((b-a)/86400000);
+function save(){localStorage.setItem(KEY,JSON.stringify(data));render()}
+function addPeriod(){
+  const s=$("startDate").value,e=$("endDate").value;
+  if(!s||!e||iso(e)<iso(s)) return alert("Please enter valid start and end dates.");
+  data.push({start:s,end:e,flow:$("flow").value,symptoms:$("symptoms").value});
+  data.sort((a,b)=>iso(a.start)-iso(b.start)); save();
+  $("symptoms").value="";
+}
+function seedDemo(){
+  const base=new Date(); base.setDate(1);
+  data=[];
+  [0,-29,-58,-88,-116,-145].forEach((offset,i)=>{
+    const s=new Date(base);s.setDate(s.getDate()+offset);
+    const e=new Date(s);e.setDate(e.getDate()+5+(i%2));
+    data.push({start:s.toISOString().slice(0,10),end:e.toISOString().slice(0,10),flow:i===3?"Heavy":"Medium",symptoms:i===2?"cramps, fatigue":"mild cramps"});
+  });
+  data.sort((a,b)=>iso(a.start)-iso(b.start));save();
+}
+function clearData(){if(confirm("Clear all locally stored cycle data?")){data=[];save()}}
+function stats(){
+  if(!data.length)return null;
+  const periods=data.map(x=>diff(iso(x.start),new Date(iso(x.end).getTime()+86400000)));
+  const cycles=data.slice(1).map((x,i)=>diff(iso(data[i].start),iso(x.start)));
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+  return {periods,cycles,avgP:avg(periods),avgC:avg(cycles)};
+}
+function analysis(){
+  const st=stats(); if(!st)return;
+  $("avgCycle").textContent=st.avgC?st.avgC.toFixed(1):"—";
+  $("avgPeriod").textContent=st.avgP?st.avgP.toFixed(1):"—";
+  const last=data[data.length-1], next=new Date(iso(last.start));
+  next.setDate(next.getDate()+Math.round(st.avgC||28));
+  $("nextPeriod").textContent=st.avgC?fmt(next):"—";
+  let flags=[];
+  if(st.avgP>7)flags.push("period duration is repeatedly >7 days");
+  if(st.avgC && (st.avgC<21||st.avgC>35))flags.push("average cycle is outside the typical adult 21–35 day range");
+  if(st.cycles.length>=3){
+    const min=Math.min(...st.cycles),max=Math.max(...st.cycles);
+    if(max-min>9)flags.push("cycle length varies considerably");
+  }
+  if(data.some(x=>x.flow==="Very heavy"))flags.push("very heavy flow has been logged");
+  if(flags.length){
+    $("healthScore").textContent="Review";
+    $("healthBox").className="alert warn";
+    $("healthBox").innerHTML="<b>Pattern to review</b><br>"+flags.map(x=>"• "+x).join("<br>")+"<br><br>Tracking is useful, but this app cannot determine the cause.";
+  }else{
+    $("healthScore").textContent="Stable";
+    $("healthBox").className="alert good";
+    $("healthBox").innerHTML="<b>No major calendar red flags detected.</b><br>Your logged timing/duration currently sits within common reference ranges. This does not prove that everything is medically healthy.";
+  }
+  const lastS=iso(last.start), end=iso(last.end);
+  const ov=new Date(lastS);ov.setDate(ov.getDate()+Math.round((st.avgC||28)-14));
+  const f1=new Date(ov);f1.setDate(f1.getDate()-5), f2=new Date(ov);f2.setDate(f2.getDate()+1);
+  $("p1").textContent=`Day 1–${Math.max(1,Math.round(st.avgP||5))}`;
+  $("p2").textContent=`After bleeding → ~day ${Math.max(2,Math.round((st.avgC||28)-14)-1)}`;
+  $("p3").textContent=`~${fmt(ov)}`;
+  $("p4").textContent=`${fmt(f1)} → ${fmt(f2)}`;
+  $("p5").textContent=`After estimated ovulation → next period`;
+  const rec=[];
+  if(data.some(x=>x.flow==="Heavy"||x.flow==="Very heavy") || st.avgP>7){
+    rec.push(["Iron", "Food-first focus: meat, fish, eggs, beans, lentils and leafy greens. Consider CBC/ferritin discussion with a clinician if bleeding is heavy/prolonged or fatigue/dizziness occurs. Do not self-prescribe high-dose iron."]);
+  }
+  rec.push(["Magnesium", "Magnesium-rich foods such as nuts, seeds, legumes and leafy greens can support overall nutrition. A supplement should be considered based on diet, symptoms and clinician/pharmacist advice."]);
+  rec.push(["Vitamin D", "Consider dietary sources and appropriate sun exposure. Supplementation is most useful when intake or blood level is low; avoid high-dose self-treatment."]);
+  rec.push(["B vitamins / folate", "Use food sources such as leafy greens, legumes, eggs and whole grains. If pregnancy is possible/planned, folic acid needs are a separate priority and should be discussed with a clinician."]);
+  rec.push(["Herbal products", "Do not automatically add vitex/chasteberry, dong quai, evening primrose, or 'hormone balancing' blends. Evidence and interactions vary, and they may be inappropriate with medicines, pregnancy or certain conditions."]);
+  $("recommendations").innerHTML="<table><thead><tr><th>Category</th><th>Evidence-aware plan</th></tr></thead><tbody>"+rec.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td></tr>`).join("")+"</tbody></table>";
+}
+function calendar(){
+  const now=new Date(); now.setHours(0,0,0,0); $("monthLabel").textContent=new Intl.DateTimeFormat(undefined,{month:"long",year:"numeric"}).format(now);
+  const y=now.getFullYear(),m=now.getMonth(),first=new Date(y,m,1),last=new Date(y,m+1,0);
+  let cells="";
+  ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].forEach(x=>cells+=`<div class="day-head">${x}</div>`);
+  for(let i=0;i<first.getDay();i++)cells+=`<div class="day empty"></div>`;
+  const st=stats(); let predicted=null;
+  if(data.length&&st?.avgC){predicted=iso(data[data.length-1].start);predicted.setDate(predicted.getDate()+Math.round(st.avgC))}
+  for(let d=1;d<=last.getDate();d++){
+    const date=new Date(y,m,d), ds=date.toISOString().slice(0,10);
+    let cls="",tag="";
+    const rec=data.find(x=>date>=iso(x.start)&&date<=iso(x.end));
+    if(rec){cls="period";tag="Period";}
+    else if(predicted){
+      const delta=diff(predicted,date);
+      if(delta>=-5&&delta<=1){cls="fertile";tag="Fertile*";}
+      if(delta===0){cls="ovulation";tag="Est. period";}
+    }
+    cells+=`<div class="day ${cls}"><span class="num">${d}</span>${tag?`<div class="pill">${tag}</div>`:""}</div>`;
+  }
+  $("calendar").innerHTML=cells;
+}
+function history(){
+  $("history").innerHTML=data.slice().reverse().map((x,idx,arr)=>{
+    const next=data.slice().reverse()[idx+1];
+    const cycle=next?diff(iso(next.start),iso(x.start)):"—";
+    const duration=diff(iso(x.start),new Date(iso(x.end).getTime()+86400000));
+    return `<tr><td>${fmt(iso(x.start))}</td><td>${fmt(iso(x.end))}</td><td>${duration} d</td><td>${cycle}${cycle!=="—"?" d":""}</td><td>${x.flow}</td><td>${x.symptoms||"—"}</td></tr>`;
+  }).join("");
+}
+function chart(){
+  const c=$("chart"),ctx=c.getContext("2d"),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);
+  if(data.length<2){ctx.font="16px system-ui";ctx.fillStyle="#727582";ctx.fillText("Add at least 2 cycles to see the trend.",30,55);return}
+  const vals=data.slice(1).map((x,i)=>diff(iso(data[i].start),iso(x.start)));
+  const min=Math.min(...vals)-2,max=Math.max(...vals)+2;
+  ctx.strokeStyle="#e7e7ef";ctx.fillStyle="#727582";ctx.font="12px system-ui";
+  for(let i=0;i<5;i++){let y=30+i*(h-60)/4;ctx.beginPath();ctx.moveTo(50,y);ctx.lineTo(w-25,y);ctx.stroke();let v=max-i*(max-min)/4;ctx.fillText(v.toFixed(0)+"d",8,y+4)}
+  ctx.beginPath();ctx.strokeStyle="#8b5cf6";ctx.lineWidth=4;
+  vals.forEach((v,i)=>{const x=60+i*(w-100)/Math.max(1,vals.length-1),y=30+(max-v)/(max-min)*(h-60);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);ctx.fillStyle="#ec4899";ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill();ctx.beginPath()});ctx.stroke();
+}
+function render(){analysis();calendar();history();chart()}
+render();
+</script>
+</body>
+</html>
