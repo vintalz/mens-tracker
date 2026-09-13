@@ -69,13 +69,30 @@ canvas{width:100%;height:260px;border:1px solid var(--line);border-radius:16px;b
       <div class="field"><label>Flow</label><select id="flow"><option>Light</option><option selected>Medium</option><option>Heavy</option><option>Very heavy</option></select></div>
       <div class="field"><label>Notes / symptoms</label><input id="symptoms" placeholder="cramps, headache, mood..."></div>
     </div>
-    <div class="actions"><button class="primary" onclick="addPeriod()">Add cycle</button><button class="secondary" onclick="seedDemo()">Load demo data</button><button class="secondary" onclick="clearData()">Clear data</button></div>
+    <div class="actions">
+      <button class="primary" onclick="addPeriod()">Add cycle</button>
+      <button class="secondary" onclick="seedDemo()">Load demo data</button>
+      <button class="secondary" onclick="exportData()">Export data</button>
+      <button class="secondary" onclick="document.getElementById('importFile').click()">Import data</button>
+      <button class="secondary" onclick="clearData()">Clear data</button>
+      <input id="importFile" type="file" accept=".json,application/json" style="display:none" onchange="importData(event)">
+    </div>
+    <div class="note" style="margin-top:10px">Export creates a JSON backup of your cycle history. Keep the file somewhere safe and use Import to restore it on another browser/device.</div>
   </section>
 
   <section class="card">
-    <div class="section-title"><h2>2. Cycle calendar</h2><span class="note" id="monthLabel"></span></div>
+    <div class="section-title">
+  <h2>2. Cycle calendar</h2>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button class="secondary" style="width:auto;padding:8px 12px" onclick="changeMonth(-1)">‹</button>
+    <span class="note" id="monthLabel" style="min-width:130px;text-align:center"></span>
+    <button class="secondary" style="width:auto;padding:8px 12px" onclick="changeMonth(1)">›</button>
+    <button class="secondary" style="width:auto;padding:8px 12px" onclick="goToday()">Today</button>
+  </div>
+</div>
     <div class="calendar-wrap"><div id="calendar" class="calendar"></div></div>
-    <div class="note" style="margin-top:10px">Pink = predicted/recorded bleeding • Green = estimated fertile window • Yellow = estimated ovulation. Fertile-window estimates are not reliable contraception.</div>
+    <div class="note" style="margin-top:10px">Pink = recorded/predicted bleeding • Green = estimated fertile window • Yellow = estimated ovulation. Use ‹ and › to browse July, August, September, and any other month. Fertile-window estimates are not reliable contraception.</div>
+    <div id="yearOverview" style="margin-top:18px"></div>
   </section>
 
   <section class="card">
@@ -125,6 +142,74 @@ function addPeriod(){
   data.sort((a,b)=>iso(a.start)-iso(b.start)); save();
   $("symptoms").value="";
 }
+
+function exportData(){
+  if(!data.length){
+    alert("There is no cycle data to export yet.");
+    return;
+  }
+  const backup={
+    app:"LunaCycle",
+    version:1,
+    exportedAt:new Date().toISOString(),
+    cycles:data
+  };
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  const stamp=new Date().toISOString().slice(0,10);
+  a.href=url;
+  a.download=`LunaCycle_backup_${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importData(event){
+  const file=event.target.files?.[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const parsed=JSON.parse(e.target.result);
+      const imported=Array.isArray(parsed)?parsed:parsed.cycles;
+      if(!Array.isArray(imported))throw new Error("Invalid format");
+
+      const valid=imported.filter(x=>{
+        return x && typeof x.start==="string" && typeof x.end==="string" &&
+          /^\d{4}-\d{2}-\d{2}$/.test(x.start) &&
+          /^\d{4}-\d{2}-\d{2}$/.test(x.end) &&
+          !isNaN(iso(x.start)) && !isNaN(iso(x.end)) &&
+          iso(x.end)>=iso(x.start);
+      }).map(x=>({
+        start:x.start,
+        end:x.end,
+        flow:["Light","Medium","Heavy","Very heavy"].includes(x.flow)?x.flow:"Medium",
+        symptoms:typeof x.symptoms==="string"?x.symptoms:""
+      }));
+
+      if(!valid.length)throw new Error("No valid cycle records found");
+
+      const merge=[...data,...valid];
+      const unique=[];
+      const seen=new Set();
+      merge.forEach(x=>{
+        const key=`${x.start}|${x.end}|${x.flow}|${x.symptoms}`;
+        if(!seen.has(key)){seen.add(key);unique.push(x);}
+      });
+      data=unique.sort((a,b)=>iso(a.start)-iso(b.start));
+      save();
+      alert(`Imported ${valid.length} cycle record(s). Your existing data was kept.`);
+    }catch(err){
+      alert("Could not import this file. Please use a LunaCycle JSON backup.");
+    }finally{
+      event.target.value="";
+    }
+  };
+  reader.readAsText(file);
+}
+
 function seedDemo(){
   const base=new Date(); base.setDate(1);
   data=[];
@@ -185,8 +270,22 @@ function analysis(){
   rec.push(["Herbal products", "Do not automatically add vitex/chasteberry, dong quai, evening primrose, or 'hormone balancing' blends. Evidence and interactions vary, and they may be inappropriate with medicines, pregnancy or certain conditions."]);
   $("recommendations").innerHTML="<table><thead><tr><th>Category</th><th>Evidence-aware plan</th></tr></thead><tbody>"+rec.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td></tr>`).join("")+"</tbody></table>";
 }
+let calendarDate=new Date();
+calendarDate.setDate(1);
+
+function changeMonth(step){
+  calendarDate.setMonth(calendarDate.getMonth()+step);
+  calendar();
+}
+function goToday(){
+  calendarDate=new Date();
+  calendarDate.setDate(1);
+  calendar();
+}
+
 function calendar(){
-  const now=new Date(); now.setHours(0,0,0,0); $("monthLabel").textContent=new Intl.DateTimeFormat(undefined,{month:"long",year:"numeric"}).format(now);
+  const now=new Date(calendarDate.getFullYear(),calendarDate.getMonth(),1);
+  $("monthLabel").textContent=new Intl.DateTimeFormat(undefined,{month:"long",year:"numeric"}).format(now);
   const y=now.getFullYear(),m=now.getMonth(),first=new Date(y,m,1),last=new Date(y,m+1,0);
   let cells="";
   ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].forEach(x=>cells+=`<div class="day-head">${x}</div>`);
@@ -200,13 +299,45 @@ function calendar(){
     if(rec){cls="period";tag="Period";}
     else if(predicted){
       const delta=diff(predicted,date);
-      if(delta>=-5&&delta<=1){cls="fertile";tag="Fertile*";}
-      if(delta===0){cls="ovulation";tag="Est. period";}
+      if(delta>=0&&delta<Math.max(2,Math.round(st?.avgP||5))){cls="period";tag="Predicted";}
+      else if(delta>=-5&&delta<=1){cls="fertile";tag="Fertile*";}
+      if(delta===0){cls="period";tag="Predicted";}
     }
     cells+=`<div class="day ${cls}"><span class="num">${d}</span>${tag?`<div class="pill">${tag}</div>`:""}</div>`;
   }
   $("calendar").innerHTML=cells;
+  yearOverview();
 }
+
+function yearOverview(){
+  const year=calendarDate.getFullYear();
+  const names=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const st=stats();
+  if(!st||!data.length){
+    $("yearOverview").innerHTML="";
+    return;
+  }
+  const lastRec=data[data.length-1];
+  let html='<div class="label" style="margin-bottom:8px">'+year+' overview</div><div style="display:grid;grid-template-columns:repeat(12,1fr);gap:5px">';
+  for(let m=0;m<12;m++){
+    const monthStart=new Date(year,m,1),monthEnd=new Date(year,m+1,0);
+    let marks="";
+    data.forEach(x=>{
+      const a=iso(x.start),b=iso(x.end);
+      if(a<=monthEnd && b>=monthStart) marks+='<span style="display:block;height:8px;border-radius:5px;background:#f9a8d4;margin-top:5px"></span>';
+    });
+    if(st.avgC){
+      const pred=iso(lastRec.start);
+      while(pred<monthStart) pred.setDate(pred.getDate()+Math.round(st.avgC));
+      while(pred>monthEnd) pred.setDate(pred.getDate()-Math.round(st.avgC));
+      if(pred>=monthStart&&pred<=monthEnd) marks+='<span style="display:block;height:5px;border-radius:5px;background:#c4b5fd;margin-top:3px"></span>';
+    }
+    html+=`<div onclick="calendarDate=new Date(${year},${m},1);calendar()" style="cursor:pointer;text-align:center;padding:8px 3px;border:1px solid var(--line);border-radius:9px;background:white;font-size:11px"><b>${names[m]}</b>${marks||'<span style="display:block;height:13px"></span>'}</div>`;
+  }
+  html+='</div>';
+  $("yearOverview").innerHTML=html;
+}
+
 function history(){
   $("history").innerHTML=data.slice().reverse().map((x,idx,arr)=>{
     const next=data.slice().reverse()[idx+1];
@@ -225,7 +356,7 @@ function chart(){
   ctx.beginPath();ctx.strokeStyle="#8b5cf6";ctx.lineWidth=4;
   vals.forEach((v,i)=>{const x=60+i*(w-100)/Math.max(1,vals.length-1),y=30+(max-v)/(max-min)*(h-60);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);ctx.fillStyle="#ec4899";ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill();ctx.beginPath()});ctx.stroke();
 }
-function render(){analysis();calendar();history();chart()}
+function render(){analysis();calendar();yearOverview();history();chart()}
 render();
 </script>
 </body>
